@@ -1,5 +1,5 @@
 
-import { Grade, ChatMode, ImageStyle, LightingStyle } from './types';
+import { Grade, ChatMode, ImageStyle, LightingStyle } from '../types';
 
 // Icons
 const ICON_ABC_BLOCKS = 'M4 4h4v4H4V4zm6 0h4v4h-4V4zm-6 6h4v4H4v-4zm13.75-2.25a.75.75 0 00-1.5 0V9h-2.5a.75.75 0 000 1.5h2.5v1.25a2 2 0 11-4 0v-1a.75.75 0 00-1.5 0v1a3.5 3.5 0 107 0V7.75zM10 16h4v4h-4v-4z';
