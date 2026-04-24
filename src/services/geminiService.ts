@@ -23,7 +23,12 @@ const moderatePrompt = (prompt: string): boolean => {
 const GUARDRAIL_ERROR = "Esta es una aplicación educativa y ese contenido no está permitido.";
 
 const getAI = (customKey?: string) => {
-    return new GoogleGenAI({ apiKey: customKey || import.meta.env.VITE_GEMINI_API_KEY });
+    // Check multiple places for the API key to ensure it works locally and on Vercel
+    const apiKey = customKey || import.meta.env.VITE_GEMINI_API_KEY || (process as any).env.GEMINI_API_KEY;
+    if (!apiKey) {
+        console.error("No se encontró GEMINI_API_KEY o VITE_GEMINI_API_KEY en las variables de entorno.");
+    }
+    return new GoogleGenAI({ apiKey: apiKey || "" });
 };
 
 
