@@ -11,6 +11,8 @@ import ImagePopup from './components/ImagePopup';
 import FlashcardModal from './components/FlashcardModal';
 import AccessRequestModal from './components/AccessRequestModal';
 import AdminDashboard from './components/AdminDashboard';
+import SettingsModal from './components/SettingsModal';
+
 import { 
   auth, db, googleProvider, appleProvider, signInWithPopup, signOut, onAuthStateChanged, 
   doc, getDoc, setDoc, updateDoc, onSnapshot, FirebaseUser,
@@ -26,6 +28,15 @@ import { TOOL_DEFINITIONS, GRADES } from './constants';
 import * as geminiService from './services/geminiService';
 import { fileToGenerativePart } from './utils/audio';
 import { motion, AnimatePresence } from 'framer-motion';
+
+const MONTHLY_BUDGET_MXN = 25;
+const COSTS = {
+    FLASH: 0.01,
+    PRO: 0.1,
+    IMAGE: 0.5,
+    RESEARCH: 0.2
+};
+
 
 const MathSubmenu: React.FC<{ onAction: (p: string) => void }> = ({ onAction }) => {
   const [showTables, setShowTables] = useState(false);
@@ -76,6 +87,8 @@ const App: React.FC = () => {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+
 
   const [userName, setUserName] = useState<string | null>(null);
   const [userAge, setUserAge] = useState<number | null>(null);
@@ -173,18 +186,20 @@ const App: React.FC = () => {
           data.role = 'admin';
         }
 
-        // Reset daily usage if it's a new day
-        const today = new Date().toISOString().split('T')[0];
-        if (data.lastUsageDate !== today) {
+        // Reset monthly cost if it's a new month
+        const now = new Date();
+        const currentMonth = `${now.getFullYear()}-${now.getMonth() + 1}`;
+        if (data.lastCostResetDate !== currentMonth) {
           await updateDoc(doc(db, 'users', user.uid), {
-            dailyUsageCount: 0,
-            lastUsageDate: today
+            monthlyCostUsed: 0,
+            lastCostResetDate: currentMonth
           });
-          data.dailyUsageCount = 0;
-          data.lastUsageDate = today;
+          data.monthlyCostUsed = 0;
+          data.lastCostResetDate = currentMonth;
         }
 
         setUserProfile(data);
+
         setUserName(data.name);
         if (data.age) setUserAge(data.age);
         if (data.gradeId) {
@@ -219,8 +234,10 @@ const App: React.FC = () => {
           isApproved: isApproved,
           tokensPerDay: 100,
           dailyUsageCount: 0,
-          lastUsageDate: new Date().toISOString().split('T')[0]
+          lastUsageDate: new Date().toISOString().split('T')[0],
+          subscriptionLevel: 'free'
         };
+
         await setDoc(doc(db, 'users', user.uid), newProfile);
         setUserProfile(newProfile);
         setUserName(newProfile.name);
@@ -296,9 +313,11 @@ const App: React.FC = () => {
         await setDoc(doc(db, 'users', currentUser.uid), {
           name,
           age,
-          gradeId: grade.id
+          gradeId: grade.id,
+          personalApiKey: (userProfile?.subscriptionLevel === 'basic' || userProfile?.subscriptionLevel === 'pro') ? userProfile.personalApiKey : undefined
         }, { merge: true });
         setUserProfile(prev => prev ? { ...prev, name, age, gradeId: grade.id } : null);
+
       } catch (error) {
         console.error('Error saving profile data:', error);
       }
@@ -323,11 +342,37 @@ const App: React.FC = () => {
   const handleSendMessage = async (text: string, file?: File, isReviewMode?: boolean, quizCount?: number) => {
       if (!selectedGrade || !userProfile) return;
 
-      // Check usage limits
-      if (userProfile.role !== 'admin' && userProfile.dailyUsageCount >= userProfile.tokensPerDay) {
-          addMessage(Role.MODEL, "¡Ups! Has alcanzado tu límite de mensajes por hoy. Vuelve mañana para seguir aprendiendo con Techie. 🚀");
+      // Check subscription and API key
+      const isBasicTier = userProfile.subscriptionLevel === 'basic';
+      const personalApiKey = userProfile.personalApiKey;
+
+      if (isBasicTier && !personalApiKey) {
+          addMessage(Role.MODEL, "¡Hola! Estás en la suscripción de $50 MXN (Usa tu propia cuota). Por favor, ingresa tu API Key de Gemini en tu perfil para continuar.");
           return;
       }
+
+      // Check usage limits for non-basic users
+      if (userProfile.role !== 'admin' && !isBasicTier) {
+          const isOverDailyLimit = userProfile.dailyUsageCount >= userProfile.tokensPerDay;
+
+          // Free users only have the daily limit
+          if (userProfile.subscriptionLevel === 'free' && isOverDailyLimit) {
+              addMessage(Role.MODEL, "¡Ups! Has alcanzado tu límite de mensajes por hoy. Vuelve mañana para seguir aprendiendo con Techie. 🚀");
+              return;
+          }
+
+          // Pro users have daily limit + monthly overflow budget
+          if (userProfile.subscriptionLevel === 'pro' && isOverDailyLimit) {
+              const isOverMonthlyBudget = (userProfile.monthlyCostUsed || 0) >= MONTHLY_BUDGET_MXN;
+              if (isOverMonthlyBudget) {
+                  addMessage(Role.MODEL, "Has alcanzado tanto tu límite diario como tu presupuesto mensual Premium Plus. Tu saldo se reiniciará el próximo mes. 📈");
+                  return;
+              }
+          }
+      }
+
+
+
 
       // Special handling for image studio mode with file attachment
       if (chatMode === 'image-studio' && file) {
@@ -359,22 +404,24 @@ const App: React.FC = () => {
       try {
           let response: any;
           const history = getSimplifiedHistory([...messages, { role: Role.USER, content: text, timestamp: Date.now() }]);
+          const customKey = isBasicTier ? personalApiKey : undefined;
 
           if (chatMode === 'quiz-master' && !isInitialGreeting) {
-              const quizQuestions = await geminiService.generateTopicQuiz(text, selectedGrade, quizCount || 5);
+              const quizQuestions = await geminiService.generateTopicQuiz(text, selectedGrade, quizCount || 5, customKey);
               addMessage(Role.MODEL, { type: 'full-quiz', topic: text, questions: quizQuestions });
               setIsChatLoading(false); return;
           }
 
           if (isReviewMode && file) {
-             response = await geminiService.reviewHomework(await fileToGenerativePart(file), text, selectedGrade, userName, userAge);
+             response = await geminiService.reviewHomework(await fileToGenerativePart(file), text, selectedGrade, userName, userAge, customKey);
           } else if (file) {
-             response = await geminiService.analyzeImage(await fileToGenerativePart(file), text, selectedGrade, userName, userAge, history, chatMode);
+             response = await geminiService.analyzeImage(await fileToGenerativePart(file), text, selectedGrade, userName, userAge, history, chatMode, customKey);
           } else if (chatMode === 'researcher' && !isInitialGreeting) {
-             response = await geminiService.getDeepResearchResponse(text, selectedGrade, userName, userAge);
+             response = await geminiService.getDeepResearchResponse(text, selectedGrade, userName, userAge, customKey);
           } else {
-             response = await geminiService.getChatResponse(history, selectedGrade, userName, userAge, chatMode, explorerSettings.temperature, explorerSettings.persona, explorerSettings.customSystemInstruction || '');
+             response = await geminiService.getChatResponse(history, selectedGrade, userName, userAge, chatMode, explorerSettings.temperature, explorerSettings.persona, explorerSettings.customSystemInstruction || '', customKey);
           }
+
 
           if (response && response.text) {
               const sources: SearchSource[] = [];
@@ -396,14 +443,30 @@ const App: React.FC = () => {
                   }
               }
 
-              // Update usage count
-              if (!isInitialGreeting && userProfile.uid) {
+              // Update usage count and cost only for non-basic users
+              if (!isInitialGreeting && userProfile.uid && !isBasicTier) {
+                  const isOverDailyLimit = userProfile.dailyUsageCount >= userProfile.tokensPerDay;
+                  
                   const newCount = userProfile.dailyUsageCount + 1;
+                  let newMonthlyCost = userProfile.monthlyCostUsed || 0;
+
+                  // ONLY deduct from monthly budget if they are ALREADY over their daily free limit
+                  if (isOverDailyLimit) {
+                      let addedCost = COSTS.FLASH;
+                      if (chatMode === 'researcher') addedCost = COSTS.RESEARCH;
+                      else if (chatMode === 'image-studio') addedCost = COSTS.IMAGE;
+                      newMonthlyCost += addedCost;
+                  }
+
                   await updateDoc(doc(db, 'users', userProfile.uid), {
-                      dailyUsageCount: newCount
+                      dailyUsageCount: newCount,
+                      monthlyCostUsed: newMonthlyCost
                   });
-                  setUserProfile(prev => prev ? { ...prev, dailyUsageCount: newCount } : null);
+                  setUserProfile(prev => prev ? { ...prev, dailyUsageCount: newCount, monthlyCostUsed: newMonthlyCost } : null);
               }
+
+
+
           }
       } catch (error: any) {
           addMessage(Role.MODEL, "Hubo un problema al conectar con la biblioteca. Inténtalo de nuevo.");
@@ -533,8 +596,10 @@ const App: React.FC = () => {
           canDecrease={fontScale > 0.9}
           isAdmin={isAdmin}
           onOpenAdmin={() => { console.log('Opening Admin from Header'); setShowAdminDashboard(true); }}
+          onOpenSettings={() => setShowSettingsModal(true)}
           onLogout={handleLogout}
         />
+
 
         <main className="flex-1 flex flex-col relative">
           {!isAdmin && !userProfile?.isApproved ? (
@@ -575,7 +640,8 @@ const App: React.FC = () => {
                 selectedGrade={selectedGrade} 
                 onLogout={handleLogout}
               />
-              <Footer sessionTokensUsed={sessionTokensUsed} onLogout={handleLogout} />
+              <Footer sessionTokensUsed={sessionTokensUsed} subscriptionLevel={userProfile?.subscriptionLevel} onLogout={handleLogout} />
+
             </>
           )}
         </main>
@@ -586,17 +652,21 @@ const App: React.FC = () => {
             onGenerate={async (p, a, s, l, e, sz, src) => { 
                 setIsStudioLoading(true); 
                 try {
-                    const res = await geminiService.generateImage(p, a, selectedGrade!, userName!, s, l, e, sz, src); 
+                    const customKey = userProfile?.subscriptionLevel === 'basic' ? userProfile.personalApiKey : undefined;
+                    const res = await geminiService.generateImage(p, a, selectedGrade!, userName!, s, l, e, sz, src, customKey); 
                     if (res) { addMessage(Role.MODEL, { type: 'image', url: res.url, prompt: p }); setStudioHistory(prev => [{ type: 'image', url: res.url }, ...prev]); } 
                 } catch(e: any) { addMessage(Role.MODEL, e.message); }
+
                 setIsStudioLoading(false); 
             }}
             onEdit={async (s, p, m, style, system) => { 
                 setIsStudioLoading(true); 
                 try {
-                    const url = await geminiService.editImage(s, p, selectedGrade!, m, style, system); 
+                    const customKey = userProfile?.subscriptionLevel === 'basic' ? userProfile.personalApiKey : undefined;
+                    const url = await geminiService.editImage(s, p, selectedGrade!, m, style, system, customKey); 
                     if (url) { addMessage(Role.MODEL, { type: 'image', url, prompt: p }); setStudioHistory(prev => [{ type: 'image', url }, ...prev]); } 
                 } catch(e: any) { addMessage(Role.MODEL, e.message); }
+
                 setIsStudioLoading(false); 
             }}
             isLoading={isStudioLoading} initialEditFile={imageCreationFile} initialEditUrl={imageCreationUrl} history={studioHistory}
@@ -605,7 +675,16 @@ const App: React.FC = () => {
         <FlashcardModal isOpen={showFlashcards} cards={flashcards} onClose={() => setShowFlashcards(false)} />
         
         {showAdminDashboard && <AdminDashboard onClose={() => setShowAdminDashboard(false)} />}
+        {userProfile && (
+          <SettingsModal 
+            isOpen={showSettingsModal} 
+            onClose={() => setShowSettingsModal(false)} 
+            userProfile={userProfile} 
+            onProfileUpdate={(updated) => setUserProfile(updated)} 
+          />
+        )}
     </div>
+
   );
 };
 

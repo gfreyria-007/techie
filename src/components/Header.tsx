@@ -9,13 +9,16 @@ interface HeaderProps {
   canDecrease: boolean;
   isAdmin?: boolean;
   onOpenAdmin?: () => void;
+  onOpenSettings?: () => void;
   onLogout?: () => void;
 }
 
+
 const Header: React.FC<HeaderProps> = ({ 
   onResetProfile, onIncreaseFont, onDecreaseFont, canIncrease, canDecrease,
-  isAdmin, onOpenAdmin, onLogout
+  isAdmin, onOpenAdmin, onOpenSettings, onLogout
 }) => {
+
   return (
     <header className="bg-white p-2 sm:p-4 shadow-md border-b border-gray-100 sticky top-0 z-40 flex items-center justify-between">
       <div className="flex items-center space-x-2 sm:space-x-4">
@@ -56,6 +59,19 @@ const Header: React.FC<HeaderProps> = ({
             <span className="text-[10px] font-black uppercase tracking-widest hidden sm:block">Admin</span>
           </button>
         )}
+
+
+        {onOpenSettings && (
+          <button 
+            onClick={onOpenSettings}
+            className="p-2 hover:bg-white text-blue-700 rounded-xl transition-all flex items-center gap-2"
+            title="Ajustes de Cuenta"
+          >
+            <span className="text-lg">👤</span>
+            <span className="text-[10px] font-black uppercase tracking-widest hidden sm:block">Cuenta</span>
+          </button>
+        )}
+
         
         {isAdmin && onLogout && <div className="w-px h-6 bg-gray-200 mx-1"></div>}
 

@@ -150,15 +150,23 @@ export interface Flashcard {
   answer: string;
 }
 
+export type SubscriptionLevel = 'free' | 'basic' | 'pro';
+
 export interface UserProfile {
   uid: string;
   email: string;
   name: string;
   role: 'admin' | 'user';
   isApproved: boolean;
+  subscriptionLevel?: SubscriptionLevel;
+  personalApiKey?: string;
   tokensPerDay: number;
   dailyUsageCount: number;
   lastUsageDate: string;
+  monthlyCostUsed?: number;
+  lastCostResetDate?: string;
   age?: number;
   gradeId?: string;
 }
+
+

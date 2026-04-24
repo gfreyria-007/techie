@@ -41,7 +41,7 @@ service cloud.firestore {
       return isAuthenticated() &&
         ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
-         (request.auth.token.email == "gabsvpn@gmail.com" && request.auth.token.email_verified == true));
+         (request.auth.token.email == "gfreyria@gmail.com" && request.auth.token.email_verified == true));
     }
 
     function isValidUser(data) {
@@ -105,7 +105,7 @@ service cloud.firestore {
                        request.resource.data.dailyUsageCount == 0 &&
                        request.resource.data.tokensPerDay == 100 &&
                        ((request.resource.data.role == 'user') || 
-                        (request.auth.token.email == "gabsvpn@gmail.com" && request.auth.token.email_verified == true));
+                        (request.auth.token.email == "gfreyria@gmail.com" && request.auth.token.email_verified == true));
       allow update: if isAdmin() && isValidUser(request.resource.data) && uidUnchanged() && emailUnchanged()
                     ||
                     (isOwner(userId) &&

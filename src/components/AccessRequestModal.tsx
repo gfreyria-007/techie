@@ -13,7 +13,7 @@ const AccessRequestModal: React.FC<AccessRequestModalProps> = ({ user, onLogout,
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [requestStatus, setRequestStatus] = useState<'idle' | 'submitting' | 'success' | 'error' | 'already_exists'>('idle');
 
-  const isAdminEmail = user?.email === 'gabsvpn@gmail.com';
+  const isAdminEmail = user?.email === 'gfreyria@gmail.com';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

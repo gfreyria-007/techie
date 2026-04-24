@@ -22,6 +22,11 @@ const moderatePrompt = (prompt: string): boolean => {
 
 const GUARDRAIL_ERROR = "Esta es una aplicación educativa y ese contenido no está permitido.";
 
+const getAI = (customKey?: string) => {
+    return new GoogleGenAI({ apiKey: customKey || import.meta.env.VITE_GEMINI_API_KEY });
+};
+
+
 export const generateImage = async (
     prompt: string, 
     aspectRatio: AspectRatio, 
@@ -31,14 +36,17 @@ export const generateImage = async (
     lighting: LightingStyle = 'none',
     embeddedText?: string,
     imageSize: ImageSize = '1K',
-    sourceImage?: string // Opcional para Image-to-Image
+    sourceImage?: string, // Opcional para Image-to-Image
+    customKey?: string
 ): Promise<{ url: string, enhancedPrompt: string } | null> => {
+
     
     if (moderatePrompt(prompt)) {
         throw new Error(GUARDRAIL_ERROR);
     }
 
-    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+    const ai = getAI(customKey);
+
     
     const strictConstraints = `
         STRICT MANDATE: 
@@ -83,13 +91,16 @@ export const editImage = async (
     grade: Grade, 
     maskBase64?: string,
     style: ImageStyle = 'none',
-    systemInstructions?: string
+    systemInstructions?: string,
+    customKey?: string
 ): Promise<string | null> => {
+
     if (moderatePrompt(prompt)) {
         throw new Error(GUARDRAIL_ERROR);
     }
 
-    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+    const ai = getAI(customKey);
+
     
     let imagePart;
     if (typeof source === 'string') {
@@ -169,9 +180,11 @@ export const getChatResponse = async (
     mode: ChatMode, 
     temperature: number, 
     persona: string | null, 
-    customInstruction: string
+    customInstruction: string,
+    customKey?: string
 ) => {
-    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+    const ai = getAI(customKey);
+
     
     let systemInstruction = "";
     let useJson = true;
@@ -245,8 +258,9 @@ export const getChatResponse = async (
     });
 };
 
-export const reviewHomework = async (imagePart: any, text: string, grade: Grade, userName: string | null, age: number | null) => {
-  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+export const reviewHomework = async (imagePart: any, text: string, grade: Grade, userName: string | null, age: number | null, customKey?: string) => {
+  const ai = getAI(customKey);
+
   const prompt = `Revisa esta tarea para nivel ${grade.name}. Usa INTERNET para verificar si la información es correcta. Lenguaje adecuado para ${age} años. JSON format only.`;
   return await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
@@ -258,8 +272,9 @@ export const reviewHomework = async (imagePart: any, text: string, grade: Grade,
   });
 };
 
-export const analyzeImage = async (imagePart: any, text: string, grade: Grade, userName: string | null, age: number | null, history: any[], mode: ChatMode) => {
-    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+export const analyzeImage = async (imagePart: any, text: string, grade: Grade, userName: string | null, age: number | null, history: any[], mode: ChatMode, customKey?: string) => {
+    const ai = getAI(customKey);
+
     let systemInstruction = `Analiza la imagen educativamente para nivel ${grade.name}. Usa ACCESO A INTERNET para identificar hitos o datos reales.`;
     return await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
@@ -272,8 +287,9 @@ export const analyzeImage = async (imagePart: any, text: string, grade: Grade, u
     });
 };
 
-export const getDeepResearchResponse = async (topic: string, grade: Grade, userName: string | null, age: number | null) => {
-    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+export const getDeepResearchResponse = async (topic: string, grade: Grade, userName: string | null, age: number | null, customKey?: string) => {
+    const ai = getAI(customKey);
+
     
     let thinkingBudget = 4000;
     if (grade.id.startsWith('primaria')) {
@@ -306,8 +322,9 @@ export const getDeepResearchResponse = async (topic: string, grade: Grade, userN
     });
 };
 
-export const generateTopicQuiz = async (topic: string, grade: Grade, count: number = 10): Promise<ExamQuestion[]> => {
-    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+export const generateTopicQuiz = async (topic: string, grade: Grade, count: number = 10, customKey?: string): Promise<ExamQuestion[]> => {
+    const ai = getAI(customKey);
+
     const prompt = `Usa INTERNET para generar un examen de ${count} preguntas REALES y actualizadas sobre: ${topic} para nivel escolar ${grade.name}. JSON format.`;
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
@@ -320,8 +337,9 @@ export const generateTopicQuiz = async (topic: string, grade: Grade, count: numb
     return JSON.parse(cleanJsonString(response.text || '[]'));
 };
 
-export const generateFlashcards = async (text: string): Promise<Flashcard[]> => {
-    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+export const generateFlashcards = async (text: string, customKey?: string): Promise<Flashcard[]> => {
+    const ai = getAI(customKey);
+
     const prompt = `Genera 5 flashcards educativas basadas en el texto. JSON: [{ "question": "", "answer": "" }]`;
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',

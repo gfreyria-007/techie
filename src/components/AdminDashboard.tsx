@@ -169,7 +169,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
     }
   };
 
+  const handleUpdateSubscription = async (userId: string, level: any) => {
+    try {
+      await updateDoc(doc(db, 'users', userId), {
+        subscriptionLevel: level
+      });
+    } catch (error) {
+      console.error('Error updating subscription:', error);
+    }
+  };
+
   const handleDeleteError = async (errorId: string) => {
+
     try {
       await deleteDoc(doc(db, 'errors', errorId));
     } catch (error) {
@@ -427,6 +438,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                           </button>
                         )}
                         <div className="text-right">
+                          <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Suscripción</label>
+                          <select 
+                            value={user.subscriptionLevel || 'free'}
+                            onChange={(e) => handleUpdateSubscription(user.id, e.target.value)}
+                            className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white text-[10px] focus:outline-none"
+                          >
+                            <option value="free" className="bg-[#0f172a]">Básico (Gratis)</option>
+                            <option value="basic" className="bg-[#0f172a]">Plan $50 (Conexión Propia)</option>
+                            <option value="pro" className="bg-[#0f172a]">Plan $99 (Premium Plus)</option>
+
+                          </select>
+                        </div>
+                        <div className="text-right">
                           <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Límite Diario</label>
                           <input 
                             type="number" 
@@ -435,6 +459,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose }) => {
                             className="w-16 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white text-xs text-center focus:outline-none"
                           />
                         </div>
+
                         <button 
                           onClick={() => handleDeleteUser(user.id)}
                           className="w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
