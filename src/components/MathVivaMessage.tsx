@@ -29,8 +29,14 @@ const AggregateVisualizer: React.FC<{
     emerald: { bg: 'bg-emerald-500', text: 'text-emerald-50', border: 'border-emerald-400' }
   }[colorBase];
 
-  // Break down into aggregate blocks
+  // Break down into aggregate blocks with huge numbers support
   const denominations = [
+    { val: 1000000000, label: '1B', size: 140 },
+    { val: 100000000, label: '100M', size: 120 },
+    { val: 10000000, label: '10M', size: 110 },
+    { val: 1000000, label: '1M', size: 100 },
+    { val: 100000, label: '100k', size: 90 },
+    { val: 10000, label: '10k', size: 80 },
     { val: 1000, label: '1k', size: 64 },
     { val: 100, label: '100', size: 48 },
     { val: 10, label: '10', size: 36 },
@@ -82,7 +88,7 @@ const MathVivaMessage: React.FC<MathVivaMessageProps> = ({ content, onAction }) 
     const isAdd = content.operation.includes('+');
     const isSub = content.operation.includes('-');
     
-    const nums = content.operation.match(/\d+/g)?.map(Number) || [1, 1];
+    const nums = content.operation.match(/\d+(\.\d+)?/g)?.map(Number) || [1, 1];
 
     if (isSqrt) {
       setOpType('sqrt');
